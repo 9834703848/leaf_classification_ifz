@@ -54,7 +54,7 @@ def imaging_circle_updated(ortho_file_path,shape_temp,RESULTS_FOLDER,rr_ed_circl
 
     # Prediction example (assuming mask and class_output are properly defined)
 
-    class_dict = {1: "#FFFFFF", 3: "#00FF00", 2: "#FF0000", 4: "#000000"}
+    class_dict = {1: "#FFFFFF", 2: "#00FF00", 3: "#FF0000", 4: "#000000"}
     Col_Mat = apply_colormap(Im_RGB, circle_prediction_padded, class_dict)
     file_name_t = f"{IMAGING_PATH}/CIRCLE-RGB_prediction.png"
     save_image(Col_Mat, file_name_t)

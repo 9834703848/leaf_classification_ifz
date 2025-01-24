@@ -192,8 +192,19 @@ def process_condition_plot(params):
                         mask_pred[pos[i]] = test_pred_grid[i]
 
                     mask_pred = mask_pred.reshape((nr, nc))
-          
                     rraster = np.ones((nr, nc))
+                    with rasterio.Env():
+                        mask_profile = {
+                            'width': T1.shape[2],
+                            'height': T1.shape[1],
+                            'count': T1.shape[0],
+                            'transform': T1_transform,
+                            'crs': profile['crs'],
+                            'nodata': np.nan,
+                            'dtype': 'float32'
+                        }
+                        with rasterio.open("T1.tif", 'w', **mask_profile) as dst:
+                            dst.write(T1)
                     rr = rasterize_shapes(new_plot_leaf,mask_pred.shape,T1_transform)#label_the_leaf_regions(mask_pred, pos, new_plot_leaf)
                     rleaf = rr
                     rr[np.isnan(rr)] = 0

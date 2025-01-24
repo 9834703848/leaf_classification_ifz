@@ -193,69 +193,61 @@ def leaf_predictions(ortho_path,file_name,model,output_leaf_file,img_size):
     with rasterio.open(os.path.join(ortho_path, file_name)) as src:
         profile = src.profile
 
+
+
+# Assuming profile['crs'] is defined elsewhere in your code
     multi_poly = []
-    last_instance = 0
+    last_instance = 1  # Initialize or set appropriately based on your context
+    # Placeholder for the overlapping resolution mask, set appropriately
+    # Define your output file path
 
+    # Loop through the data using tqdm
     for data in tqdm(boxes):
+        a = np.array(data[0])
+        results = model.detect([a], verbose=1)
 
-                a = np.array(data[0])
-                results = model.detect([a], verbose=1)
-            
-                r = results[0]
+        r = results[0]
+        ss = r['masks']  # Binary mask array for detected objects
+        n_leaf = ss.shape[2]  # Number of leaf instances
 
-                #results = model.detect([a], verbose=1)
-                ss = r['masks']
-                # Segment leaves
-                n_leaf = ss.shape[2]
-                
-                if n_leaf > 1:
-                    ss = check_and_zero_out(ss,overlapping, f_res_m)
-                    label_gray = np.arange(last_instance, last_instance + n_leaf)
-                    last_instance = max(label_gray)
-                    out_gray = np.zeros((ss.shape[0], ss.shape[1]), dtype=np.int32)
-                    
-                    for i in range(n_leaf):
-                        out_gray[ss[:, :, i]] = label_gray[i]
-                    
-                    mask_tt = out_gray
-                    mask_temp = np.zeros((ss.shape[0], ss.shape[1]))
+        if n_leaf > 1:
+            ss = check_and_zero_out(ss, overlapping, f_res_m)
+            label_gray = np.arange(last_instance, last_instance + n_leaf)
+            last_instance = max(label_gray)
+            out_gray = np.zeros((ss.shape[0], ss.shape[1]), dtype=np.int32)
 
-                    mask_temp[:mask_tt.shape[0], :mask_tt.shape[1]] = mask_tt
-                    
-                    with rasterio.Env():
-                            mask_profile = {
-                                'width': mask_temp.shape[1],
-                                'height': mask_temp.shape[0],
-                                'count': 1,  # Number of bands
-                                'transform': data[1],
-                                'crs': profile['crs'],  # Change to your desired CRS
-                                'nodata': np.nan,
-                                'dtype': 'float32'}
-                            with rasterio.open("mask2.tif", 'w', **mask_profile) as dst:
-                                dst.write(mask_temp, 1)
+            for i in range(n_leaf):
+                out_gray[ss[:, :, i]] = label_gray[i]
 
-                        # Convert raster to polygons
-                    with rasterio.open("mask2.tif") as src:
-                            image = src.read(1).astype('uint8')
-                            mask_polygons = list(shapes(image, transform=data[1]))
+            mask_tt = out_gray
+            mask_temp = np.zeros((ss.shape[0], ss.shape[1]))
+            mask_temp[:mask_tt.shape[0], :mask_tt.shape[1]] = mask_tt
 
-                    polygons = []
-                    for geom, val in mask_polygons:
-                            if val != 0:
-                                polygons.append(shapely_shape(geom))
+            # Set up mask profile for in-memory operations (adjust CRS and transform as needed)
+            mask_profile = {
+                'width': mask_temp.shape[1],
+                'height': mask_temp.shape[0],
+                'count': 1,
+                'transform': data[1],
+                'crs': profile['crs'],  # Use your CRS
+                'nodata': np.nan,
+                'dtype': 'float32'
+            }
 
-                    if polygons:
-                            if not multi_poly:
-                                multi_poly = polygons
-                            else:
-                                multi_poly.extend(polygons)
+            # Directly extract polygons from the in-memory mask array
+            mask_polygons = list(shapes(mask_temp.astype('uint8'), transform=data[1]))
 
+            polygons = [shapely_shape(geom) for geom, val in mask_polygons if val != 0]
 
+            if polygons:
+                if not multi_poly:
+                    multi_poly = polygons
+                else:
+                    multi_poly.extend(polygons)
 
-    # Saving the multipoly array 
+    # Save the multipolygon array as a GeoDataFrame
     multi_poly_gdf = gpd.GeoDataFrame({'geometry': multi_poly}, crs=profile['crs'])
     multi_poly_gdf.to_file(output_leaf_file, driver='GPKG')
-
 
     end_time = time.time()
     print("\n ... processing time of leaf segmentation", round(end_time - start_time, 2), "hours \n ...")

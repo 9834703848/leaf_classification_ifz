@@ -91,6 +91,9 @@ def circle_processing(params):
 
     if "angle2cam" in pipeline["coef"] or "angle2sun" in pipeline["coef"]:
         angle2cam = process_angle_raster(slope_path, circle_gdf['geometry'], T1, T1_transform, profile, pos)
+        if np.isnan(angle2cam).all():
+                    # Replace all NaN values with 0
+                    angle2cam = np.zeros_like(angle2cam)
 
     # Prepare data
     data = np.hstack((table_bands.iloc[:, :5], table_index, angle2cam.reshape(-1, 1)))
